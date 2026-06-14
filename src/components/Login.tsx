@@ -24,18 +24,26 @@ export default function Login({ onLoginSuccess }: LoginProps) {
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await response.json();
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        const data = await response.json();
 
-      if (response.ok && data.success) {
-        // Successful login
-        localStorage.setItem("m4t1nt4_token", data.token);
-        localStorage.setItem("m4t1nt4_user", JSON.stringify(data.user));
-        onLoginSuccess(data.token, data.user);
+        if (response.ok && data.success) {
+          // Successful login
+          localStorage.setItem("m4t1nt4_token", data.token);
+          localStorage.setItem("m4t1nt4_user", JSON.stringify(data.user));
+          onLoginSuccess(data.token, data.user);
+        } else {
+          setError(data.message || "Credenciais incompatíveis para este ambiente.");
+        }
       } else {
-        setError(data.message || "Credenciais incompatíveis para este ambiente.");
+        const text = await response.text();
+        console.error("Non-JSON API response:", text);
+        setError(`Resposta da API inválida (${response.status}). Detalhes no console de logs.`);
       }
-    } catch (err) {
-      setError("Erro de rede ao conectar com a API orquestradora M4t1nt4.");
+    } catch (err: any) {
+      console.error("Network error during login request:", err);
+      setError(`Erro de conexão com o painel (${err.message || err.toString()}). Verifique a integridade do servidor.`);
     } finally {
       setLoading(false);
     }
