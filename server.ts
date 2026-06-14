@@ -8,33 +8,8 @@ const app = express();
 
 app.use(express.json());
 
-// Persistent request and error logging for diagnostic analysis
-const isVercel = !!process.env.VERCEL;
-const DEBUG_LOG_FILE = path.join(isVercel ? "/tmp" : path.join(process.cwd(), "data"), "debug.log");
-function logDebug(message: string) {
-  const timestamp = new Date().toISOString();
-  const logLine = `[${timestamp}] ${message}\n`;
-  try {
-    fs.appendFileSync(DEBUG_LOG_FILE, logLine);
-  } catch (err) {
-    console.error("Failed to write to debug log file:", err);
-  }
-}
-
-app.use((req, res, next) => {
-  logDebug(`Incoming Request: ${req.method} ${req.url} | Body: ${JSON.stringify(req.body)} | Headers: ${JSON.stringify(req.headers)}`);
-  
-  // Intercept response to log the status code
-  const originalSend = res.send;
-  res.send = function(body) {
-    logDebug(`Response for ${req.method} ${req.url}: Status ${res.statusCode} | Body Sample: ${typeof body === 'string' ? body.substring(0, 200) : 'binary-or-buffer'}`);
-    return originalSend.apply(res, arguments as any);
-  };
-  
-  next();
-});
-
 // Persistent data paths
+const isVercel = !!process.env.VERCEL;
 const DATA_DIR = isVercel ? "/tmp" : path.join(process.cwd(), "data");
 const HISTORY_FILE = path.join(DATA_DIR, "history.json");
 
