@@ -1,0 +1,6 @@
+{
+  "name": "M4t1nt4",
+  "description": "Plataforma de estudo, gerenciamento de limites de carga e monitoramento em tempo real de simulação de DoS.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
