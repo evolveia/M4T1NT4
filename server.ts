@@ -8,8 +8,33 @@ const app = express();
 
 app.use(express.json());
 
-// Persistent data paths
+// Persistent request and error logging for diagnostic analysis
 const isVercel = !!process.env.VERCEL;
+const DEBUG_LOG_FILE = path.join(isVercel ? "/tmp" : path.join(process.cwd(), "data"), "debug.log");
+function logDebug(message: string) {
+  const timestamp = new Date().toISOString();
+  const logLine = `[${timestamp}] ${message}\n`;
+  try {
+    fs.appendFileSync(DEBUG_LOG_FILE, logLine);
+  } catch (err) {
+    console.error("Failed to write to debug log file:", err);
+  }
+}
+
+app.use((req, res, next) => {
+  logDebug(`Incoming Request: ${req.method} ${req.url} | Body: ${JSON.stringify(req.body)} | Headers: ${JSON.stringify(req.headers)}`);
+  
+  // Intercept response to log the status code
+  const originalSend = res.send;
+  res.send = function(body) {
+    logDebug(`Response for ${req.method} ${req.url}: Status ${res.statusCode} | Body Sample: ${typeof body === 'string' ? body.substring(0, 200) : 'binary-or-buffer'}`);
+    return originalSend.apply(res, arguments as any);
+  };
+  
+  next();
+});
+
+// Persistent data paths
 const DATA_DIR = isVercel ? "/tmp" : path.join(process.cwd(), "data");
 const HISTORY_FILE = path.join(DATA_DIR, "history.json");
 
@@ -348,7 +373,7 @@ setInterval(() => {
 
 const PROFILE_FILE = path.join(DATA_DIR, "profile.json");
 
-let userProfile = {
+const DEFAULT_PROFILE = {
   email: "evolve.eia@gmail.com",
   name: "Evandro EIA Team",
   role: "M4t1nt4 Administrator",
@@ -361,10 +386,13 @@ let userProfile = {
   defaultSpawnRate: 15
 };
 
+let userProfile = { ...DEFAULT_PROFILE };
+
 // Load profile from file
 if (fs.existsSync(PROFILE_FILE)) {
   try {
-    userProfile = JSON.parse(fs.readFileSync(PROFILE_FILE, "utf-8"));
+    const loaded = JSON.parse(fs.readFileSync(PROFILE_FILE, "utf-8"));
+    userProfile = { ...DEFAULT_PROFILE, ...loaded };
   } catch (error) {
     console.error("Error reading profile.json, using defaults:", error);
   }
@@ -378,7 +406,7 @@ if (fs.existsSync(PROFILE_FILE)) {
 
 // Authentication
 app.post("/api/auth/login", (req, res) => {
-  const { email, password } = req.body;
+  const { email, password } = req.body || {};
   if (email === userProfile.email && password === "S@nb4f6e") {
     res.json({
       success: true,
@@ -413,7 +441,7 @@ app.put("/api/profile", (req, res) => {
     soundEffectsEnabled,
     defaultDuration,
     defaultSpawnRate
-  } = req.body;
+  } = req.body || {};
 
   if (name !== undefined) userProfile.name = name;
   if (email !== undefined) userProfile.email = email;
@@ -441,7 +469,7 @@ app.get("/api/test/current", (req, res) => {
 });
 
 app.post("/api/test/configure", (req, res) => {
-  const { targetIp, targetPort, workers, duration, attackMode } = req.body;
+  const { targetIp, targetPort, workers, duration, attackMode } = req.body || {};
   
   if (!targetIp || !targetPort || !workers || !duration || !attackMode) {
     return res.status(400).json({ error: "Parâmetros configuratórios incompletos." });
@@ -471,7 +499,7 @@ app.post("/api/test/configure", (req, res) => {
 });
 
 app.post("/api/test/control", (req, res) => {
-  const { action } = req.body; // "start" | "pause" | "resume" | "reset" | "stop"
+  const { action } = req.body || {}; // "start" | "pause" | "resume" | "reset" | "stop"
 
   if (!currentTest) {
     return res.status(400).json({ error: "Nenhum teste configurado ativo." });
@@ -542,7 +570,7 @@ app.get("/api/audits", (req, res) => {
 });
 
 app.post("/api/audits", (req, res) => {
-  const { title, targetIp, targetPort, duration, workers, attackMode, status, score, responsible, summary, recommendations, vulnerabilities } = req.body;
+  const { title, targetIp, targetPort, duration, workers, attackMode, status, score, responsible, summary, recommendations, vulnerabilities } = req.body || {};
   const newAudit: AuditReport = {
     id: "audit_" + Date.now(),
     title: title || "Laudo de Auditoria de Segurança",
@@ -570,11 +598,12 @@ app.put("/api/audits/:id", (req, res) => {
   if (idx === -1) {
     return res.status(404).json({ error: "Laudo não encontrado." });
   }
-  const updated = { ...audits[idx], ...req.body };
-  if (req.body.targetPort !== undefined) updated.targetPort = Number(req.body.targetPort);
-  if (req.body.duration !== undefined) updated.duration = Number(req.body.duration);
-  if (req.body.workers !== undefined) updated.workers = Number(req.body.workers);
-  if (req.body.score !== undefined) updated.score = parseFloat(req.body.score);
+  const body = req.body || {};
+  const updated = { ...audits[idx], ...body };
+  if (body.targetPort !== undefined) updated.targetPort = Number(body.targetPort);
+  if (body.duration !== undefined) updated.duration = Number(body.duration);
+  if (body.workers !== undefined) updated.workers = Number(body.workers);
+  if (body.score !== undefined) updated.score = parseFloat(body.score);
   
   audits[idx] = updated;
   saveAudits();
@@ -628,6 +657,17 @@ app.get("/api/metrics/live", (req, res) => {
 
   req.on("close", () => {
     clientSSEs.delete(res);
+  });
+});
+
+// Global error handling middleware to diagnostic server errors
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error("[SERVER EXCEPTION ERROR]:", err);
+  res.status(500).json({
+    success: false,
+    message: "Erro interno no servidor de simulação.",
+    error: err.message || err.toString(),
+    stack: err.stack
   });
 });
 
