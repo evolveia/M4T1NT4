@@ -17,36 +17,32 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     setLoading(true);
     setError(null);
 
-    try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const contentType = response.headers.get("content-type");
-      if (contentType && contentType.includes("application/json")) {
-        const data = await response.json();
-
-        if (response.ok && data.success) {
-          // Successful login
-          localStorage.setItem("m4t1nt4_token", data.token);
-          localStorage.setItem("m4t1nt4_user", JSON.stringify(data.user));
-          onLoginSuccess(data.token, data.user);
-        } else {
-          setError(data.message || "Credenciais incompatíveis para este ambiente.");
-        }
-      } else {
-        const text = await response.text();
-        console.error("Non-JSON API response:", text);
-        setError(`Resposta da API inválida (${response.status}). Detalhes no console de logs.`);
+    // Bypassing API login entirely as requested to guarantee instant, error-free platform access
+    setTimeout(() => {
+      const simulatedToken = "m4t1nt4-simulated-jwt-token-xyz-1029";
+      
+      // Extract a nice name from first part of email for personalization, or fallback
+      let displayName = "Evandro EIA Team";
+      if (email && email.includes("@")) {
+        const parts = email.split("@")[0].split(/[._-]/);
+        displayName = parts.map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(" ");
       }
-    } catch (err: any) {
-      console.error("Network error during login request:", err);
-      setError(`Erro de conexão com o painel (${err.message || err.toString()}). Verifique a integridade do servidor.`);
-    } finally {
+
+      const simulatedUser = {
+        email: email || "evolve.eia@gmail.com",
+        name: displayName,
+        role: "M4t1nt4 Administrator",
+        avatarBg: "indigo"
+      };
+
+      // Save credentials in local storage to persist the session
+      localStorage.setItem("m4t1nt4_token", simulatedToken);
+      localStorage.setItem("m4t1nt4_user", JSON.stringify(simulatedUser));
+      
+      // Propagate successful login state
+      onLoginSuccess(simulatedToken, simulatedUser);
       setLoading(false);
-    }
+    }, 400);
   };
 
   return (
