@@ -16,7 +16,6 @@ import {
   Play
 } from "lucide-react";
 import { AuthUser, TestRun, MetricPoint, UserProfile, AuditReport } from "./types";
-import Login from "./components/Login";
 import DocsPanel from "./components/DocsPanel";
 import AuditPanel from "./components/AuditPanel";
 import DashboardPanel from "./components/DashboardPanel";
@@ -24,10 +23,18 @@ import HistoryPanel from "./components/HistoryPanel";
 import ProfilePanel from "./components/ProfilePanel";
 
 export default function App() {
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem("m4t1nt4_token"));
-  const [user, setUser] = useState<AuthUser | null>(() => {
+  const [token, setToken] = useState<string>(() => {
+    const saved = localStorage.getItem("m4t1nt4_token");
+    return saved || "m4t1nt4-simulated-jwt-token-xyz-1029";
+  });
+  const [user, setUser] = useState<AuthUser>(() => {
     const saved = localStorage.getItem("m4t1nt4_user");
-    return saved ? JSON.parse(saved) : null;
+    return saved ? JSON.parse(saved) : {
+      email: "evolve.eia@gmail.com",
+      name: "Evandro EIA Team",
+      role: "M4t1nt4 Administrator",
+      avatarBg: "indigo"
+    };
   });
 
   const [activeTab, setActiveTab] = useState<"dashboard" | "history" | "docs" | "profile" | "audit">("dashboard");
@@ -149,17 +156,16 @@ export default function App() {
   // Ref to SSE connection
   const sseRef = useRef<EventSource | null>(null);
 
-  // Load token callback
-  const handleLoginSuccess = (newToken: string, authenticatedUser: AuthUser) => {
-    setToken(newToken);
-    setUser(authenticatedUser);
-  };
-
   const handleLogout = () => {
     localStorage.removeItem("m4t1nt4_token");
     localStorage.removeItem("m4t1nt4_user");
-    setToken(null);
-    setUser(null);
+    setToken("m4t1nt4-simulated-jwt-token-xyz-1029");
+    setUser({
+      email: "evolve.eia@gmail.com",
+      name: "Evandro EIA Team",
+      role: "M4t1nt4 Administrator",
+      avatarBg: "indigo"
+    });
   };
 
   // Fetch past histories
@@ -373,9 +379,7 @@ export default function App() {
     };
   }, [token]);
 
-  if (!token || !user) {
-    return <Login onLoginSuccess={handleLoginSuccess} />;
-  }
+  // Authentication bypass: platform is directly accessible by default
 
   // Derived current metrics helper indicators
   const metricsList = currentTest?.metrics || [];
